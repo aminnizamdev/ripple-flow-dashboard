@@ -79,7 +79,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {navigationItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild active={item.active}>
+                  <SidebarMenuButton asChild isActive={item.active}>
                     <a href={item.url} className={item.active ? "bg-sidebar-accent" : ""}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>

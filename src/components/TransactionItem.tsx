@@ -3,6 +3,7 @@ import { formatAmount, formatDate, truncateAddress } from "@/lib/ripple-websocke
 import { ArrowRight, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import React from "react";
 
 interface TransactionItemProps {
   transaction: {
@@ -17,14 +18,15 @@ interface TransactionItemProps {
     [key: string]: any;
   };
   className?: string;
+  style?: React.CSSProperties;
 }
 
-export function TransactionItem({ transaction, className }: TransactionItemProps) {
+export function TransactionItem({ transaction, className, style }: TransactionItemProps) {
   const isPayment = transaction.TransactionType === "Payment";
   const isOffer = transaction.TransactionType === "OfferCreate";
 
   return (
-    <div className={cn("transaction-card flex flex-col space-y-2", className)}>
+    <div className={cn("transaction-card flex flex-col space-y-2", className)} style={style}>
       <div className="flex justify-between items-start">
         <Badge variant="outline" className={cn(
           "font-medium",
