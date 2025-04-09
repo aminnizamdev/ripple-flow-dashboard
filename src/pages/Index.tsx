@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { TransactionList } from "@/components/TransactionList";
@@ -19,7 +18,8 @@ import { NetworkStatusPanel } from "@/components/NetworkStatusPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { useMediaQuery } from "@/hooks/use-mobile";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 type Transaction = {
   TransactionType: string;
@@ -61,7 +61,7 @@ const Index = () => {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   
   // Check if the device is mobile
-  const isMobile = useMediaQuery("(max-width: 768px)");
+  const isMobile = useIsMobile();
   
   // Handle transaction selection
   const handleTransactionSelect = (tx: Transaction) => {
