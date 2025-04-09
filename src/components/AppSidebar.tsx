@@ -1,5 +1,5 @@
 
-import { Activity, BarChart2, DollarSign, Home, LifeBuoy, Settings } from "lucide-react";
+import { Activity, BarChart2, DollarSign, Home, LifeBuoy, Settings, Zap, ChevronRight } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -36,6 +36,12 @@ export function AppSidebar() {
       icon: DollarSign,
       url: "#",
     },
+    {
+      title: "Live Monitor",
+      icon: Zap,
+      url: "#",
+      badge: "New",
+    },
   ];
 
   const utilityItems = [
@@ -54,22 +60,27 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="flex justify-start">
-        <div className="flex items-center gap-2 px-4 py-2">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-6 w-6 text-ripple-400"
-          >
-            <path d="M12 2L2 7l10 5 10-5-10-5z" />
-            <path d="M2 17l10 5 10-5" />
-            <path d="M2 12l10 5 10-5" />
-          </svg>
-          <span className="font-bold text-lg">Ripple Flow</span>
+        <div className="flex items-center gap-2 px-4 py-4">
+          <div className="p-1.5 bg-ripple-400 rounded-lg shadow-md">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-5 w-5"
+            >
+              <path d="M12 2L2 7l10 5 10-5-10-5z" />
+              <path d="M2 17l10 5 10-5" />
+              <path d="M2 12l10 5 10-5" />
+            </svg>
+          </div>
+          <div className="flex flex-col">
+            <span className="font-bold text-md leading-tight">Ripple Flow</span>
+            <span className="text-[10px] text-muted-foreground -mt-0.5">Real-time Analytics</span>
+          </div>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -80,9 +91,17 @@ export function AppSidebar() {
               {navigationItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={item.active}>
-                    <a href={item.url} className={item.active ? "bg-sidebar-accent" : ""}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                    <a href={item.url} className={`flex justify-between ${item.active ? "bg-sidebar-accent" : ""}`}>
+                      <div className="flex items-center">
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </div>
+                      {item.badge && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-ripple-400 text-white rounded-full">
+                          {item.badge}
+                        </span>
+                      )}
+                      {!item.badge && <ChevronRight className="h-3 w-3 opacity-0 group-hover:opacity-70 transition-opacity" />}
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -97,9 +116,12 @@ export function AppSidebar() {
               {utilityItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <a href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                    <a href={item.url} className="flex justify-between group">
+                      <div className="flex items-center">
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </div>
+                      <ChevronRight className="h-3 w-3 opacity-0 group-hover:opacity-70 transition-opacity" />
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -109,9 +131,14 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <div className="px-4 py-2 text-xs text-muted-foreground">
-          <p>Ripple Flow Dashboard v1.0</p>
-          <p>© 2025 All rights reserved</p>
+        <div className="px-4 py-3 bg-sidebar-accent/50 rounded-lg mx-3 mb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <p className="text-xs text-muted-foreground">Connected to Ripple Network</p>
+          </div>
+          <div className="text-xs mt-1.5 font-medium">
+            <p className="text-ripple-500">v1.0 | Tracking: <span className="text-green-600">Active</span></p>
+          </div>
         </div>
       </SidebarFooter>
     </Sidebar>

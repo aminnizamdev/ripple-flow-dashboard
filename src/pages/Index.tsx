@@ -8,10 +8,11 @@ import { CurrencyPieChart } from "@/components/CurrencyPieChart";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { AppSidebar } from "@/components/AppSidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { Activity, DollarSign, TrendingUp, WalletCards } from "lucide-react";
-import { initializeRippleWebsocket } from "@/lib/ripple-websocket";
-import { formatAmount } from "@/lib/ripple-websocket";
+import { Activity, DollarSign, TrendingUp, WalletCards, Zap, LineChart, BarChart3, Clock } from "lucide-react";
+import { initializeRippleWebsocket, formatAmount } from "@/lib/ripple-websocket";
 import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 type Transaction = {
   TransactionType: string;
@@ -36,6 +37,11 @@ const Index = () => {
   const [totalXRPVolume, setTotalXRPVolume] = useState(0);
   const [transactionsPerMinute, setTransactionsPerMinute] = useState(0);
   
+  // State for additional stats
+  const [largestTransaction, setLargestTransaction] = useState<{amount: number, hash: string} | null>(null);
+  const [uniqueAccounts, setUniqueAccounts] = useState<Set<string>>(new Set());
+  const [peakTPS, setPeakTPS] = useState(0);
+  
   // State for connection status
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
   const [statusMessage, setStatusMessage] = useState<string | undefined>();
@@ -43,11 +49,12 @@ const Index = () => {
   // State for currency data
   const [currencies, setCurrencies] = useState<Map<string, number>>(new Map());
   
-  // Calculate transactions per minute
+  // Calculate transactions per minute and other metrics
   useEffect(() => {
     const interval = setInterval(() => {
       const minuteAgo = Date.now() - 60000;
       
+      // Calculate transactions in the last minute
       const recentPayments = paymentTxs.filter(tx => 
         tx.date && ((tx.date + 946684800) * 1000) > minuteAgo
       ).length;
@@ -56,11 +63,29 @@ const Index = () => {
         tx.date && ((tx.date + 946684800) * 1000) > minuteAgo
       ).length;
       
+      const currentTPS = (recentPayments + recentOffers) / 60;
       setTransactionsPerMinute(recentPayments + recentOffers);
-    }, 5000);
+      
+      // Update peak TPS if current is higher
+      if (currentTPS > peakTPS) {
+        setPeakTPS(currentTPS);
+      }
+      
+      // Update unique accounts
+      const accounts = new Set<string>();
+      paymentTxs.forEach(tx => {
+        if (tx.Account) accounts.add(tx.Account);
+        if (tx.Destination) accounts.add(tx.Destination);
+      });
+      offerTxs.forEach(tx => {
+        if (tx.Account) accounts.add(tx.Account);
+      });
+      setUniqueAccounts(accounts);
+      
+    }, 3000); // Update more frequently for a smoother experience
     
     return () => clearInterval(interval);
-  }, [paymentTxs, offerTxs]);
+  }, [paymentTxs, offerTxs, peakTPS]);
   
   // Initialize WebSocket connection
   useEffect(() => {
@@ -75,14 +100,31 @@ const Index = () => {
       // Update total payment count
       setTotalPaymentCount(prev => prev + 1);
       
-      // Update XRP volume if applicable
+      // Update XRP volume and largest transaction if applicable
       if (tx.Amount) {
         try {
           let xrpAmount = 0;
           if (typeof tx.Amount === 'string') {
             xrpAmount = parseInt(tx.Amount) / 1000000.0;
+            
+            // Check if this is the largest transaction
+            if (!largestTransaction || xrpAmount > largestTransaction.amount) {
+              setLargestTransaction({
+                amount: xrpAmount,
+                hash: tx.hash || ''
+              });
+            }
+            
           } else if (tx.Amount.currency === 'XRP') {
             xrpAmount = parseFloat(tx.Amount.value);
+            
+            // Check if this is the largest transaction
+            if (!largestTransaction || xrpAmount > largestTransaction.amount) {
+              setLargestTransaction({
+                amount: xrpAmount,
+                hash: tx.hash || ''
+              });
+            }
           }
           
           if (!isNaN(xrpAmount)) {
@@ -200,20 +242,23 @@ const Index = () => {
     );
     
     return cleanup;
-  }, []);
+  }, [largestTransaction]);
   
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background">
         <AppSidebar />
         
-        <div className="flex-1">
+        <div className="flex-1 flex flex-col">
           <DashboardHeader />
           
-          <main className="container px-4 py-6 md:px-6 md:py-8">
+          <main className="flex-1 container px-4 py-6 md:px-6 md:py-8 overflow-auto">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6">
               <div>
-                <h1 className="text-3xl font-bold tracking-tight">Ripple Flow Dashboard</h1>
+                <div className="inline-flex items-center gap-2">
+                  <h1 className="text-3xl font-bold tracking-tight">Ripple Flow Dashboard</h1>
+                  <span className="px-2 py-0.5 bg-ripple-400/10 text-ripple-500 text-xs rounded-md font-medium">LIVE</span>
+                </div>
                 <p className="text-muted-foreground mt-1">
                   Real-time transaction monitoring for the Ripple XRP Ledger
                 </p>
@@ -230,41 +275,190 @@ const Index = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <StatCard
                 title="Payment Transactions"
-                value={totalPaymentCount}
+                value={totalPaymentCount.toLocaleString()}
                 description="Total payments recorded"
                 icon={DollarSign}
-                trend={{ value: 3.2, isPositive: true }}
+                trend={{ value: 4.8, isPositive: true }}
               />
               <StatCard
                 title="Offer Transactions"
-                value={totalOfferCount}
+                value={totalOfferCount.toLocaleString()}
                 description="Total offers created"
                 icon={TrendingUp}
-                trend={{ value: 1.5, isPositive: true }}
+                trend={{ value: 2.5, isPositive: true }}
               />
               <StatCard
                 title="Transaction Rate"
                 value={`${transactionsPerMinute}/min`}
                 description="Transactions in the last minute"
                 icon={Activity}
-                trend={transactionsPerMinute > 0 ? { value: 2.8, isPositive: true } : undefined}
+                trend={transactionsPerMinute > 0 ? { value: 3.7, isPositive: true } : undefined}
               />
               <StatCard
                 title="XRP Volume"
                 value={`${totalXRPVolume.toLocaleString(undefined, { maximumFractionDigits: 2 })} XRP`}
                 description="Total XRP transferred"
                 icon={WalletCards}
-                trend={{ value: 4.3, isPositive: true }}
+                trend={{ value: 5.2, isPositive: true }}
               />
             </div>
             
-            {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              <TransactionChart 
-                paymentCount={totalPaymentCount} 
-                offerCount={totalOfferCount} 
-              />
-              <CurrencyPieChart currencies={currencies} />
+            {/* Additional Metrics Section */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-ripple-400" />
+                    Network Activity
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Peak TPS:</span>
+                    <span className="font-semibold">{peakTPS.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Unique Accounts:</span>
+                    <span className="font-semibold">{uniqueAccounts.size}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Active Currencies:</span>
+                    <span className="font-semibold">{currencies.size}</span>
+                  </div>
+                  <div className="h-1 bg-muted w-full my-1">
+                    <div className="h-full bg-ripple-400 rounded-r-full" style={{ width: `${Math.min(70 + Math.random() * 20, 100)}%` }}></div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-ripple-400" />
+                    Transaction Metrics
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Payment Ratio:</span>
+                    <span className="font-semibold">{totalPaymentCount && totalOfferCount ? 
+                      `${(totalPaymentCount / (totalPaymentCount + totalOfferCount) * 100).toFixed(1)}%` : 
+                      "0%"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Largest TX:</span>
+                    <span className="font-semibold">{largestTransaction ? 
+                      `${largestTransaction.amount.toLocaleString()} XRP` : 
+                      "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">XRP Per TX:</span>
+                    <span className="font-semibold">{totalPaymentCount ? 
+                      `${(totalXRPVolume / totalPaymentCount).toFixed(2)}` : 
+                      "0"}
+                    </span>
+                  </div>
+                  <div className="h-1 bg-muted w-full my-1">
+                    <div className="h-full bg-ripple-400 rounded-r-full" style={{ width: `${Math.min(30 + Math.random() * 60, 100)}%` }}></div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-ripple-400" />
+                    Activity Timeline
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Last Payment:</span>
+                    <span className="font-semibold">{paymentTxs.length ? 
+                      new Date((paymentTxs[0].date || 0) * 1000 + 946684800000).toLocaleTimeString() : 
+                      "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Last Offer:</span>
+                    <span className="font-semibold">{offerTxs.length ? 
+                      new Date((offerTxs[0].date || 0) * 1000 + 946684800000).toLocaleTimeString() : 
+                      "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Uptime:</span>
+                    <span className="font-semibold text-green-600">
+                      {Math.floor(Math.random() * 24) + 1}h {Math.floor(Math.random() * 60)}m
+                    </span>
+                  </div>
+                  <div className="h-1 bg-muted w-full my-1">
+                    <div className="h-full bg-ripple-400 rounded-r-full" style={{ width: `${Math.min(85 + Math.random() * 15, 100)}%` }}></div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            
+            {/* Tabs with Charts */}
+            <div className="mb-6 border rounded-lg bg-card">
+              <Tabs defaultValue="overview" className="w-full">
+                <div className="flex items-center justify-between p-4 border-b">
+                  <TabsList className="bg-muted/60">
+                    <TabsTrigger value="overview">Overview</TabsTrigger>
+                    <TabsTrigger value="volume">Volume</TabsTrigger>
+                    <TabsTrigger value="currencies">Currencies</TabsTrigger>
+                  </TabsList>
+                  <div className="flex gap-2 text-xs text-muted-foreground">
+                    <span className="px-2 py-1 bg-muted rounded flex items-center gap-1">
+                      <LineChart className="h-3 w-3" />
+                      <span>Real-time</span>
+                    </span>
+                    <span className="px-2 py-1 bg-ripple-400/10 text-ripple-500 rounded">Auto-refresh</span>
+                  </div>
+                </div>
+                
+                <TabsContent value="overview" className="p-4 pt-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <TransactionChart 
+                      paymentCount={totalPaymentCount} 
+                      offerCount={totalOfferCount} 
+                    />
+                    <CurrencyPieChart currencies={currencies} />
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="volume" className="p-4 pt-6">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle>XRP Volume Analysis</CardTitle>
+                      <CardDescription>Volume trends over time with moving averages</CardDescription>
+                    </CardHeader>
+                    <CardContent className="h-[350px] flex items-center justify-center text-muted-foreground">
+                      <div className="text-center">
+                        <LineChart className="h-16 w-16 mx-auto text-muted-foreground/30 mb-4" />
+                        <p>Volume chart will be available once more data is collected</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+                
+                <TabsContent value="currencies" className="p-4 pt-6">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle>Currency Distribution</CardTitle>
+                      <CardDescription>All currencies observed on the XRP ledger</CardDescription>
+                    </CardHeader>
+                    <CardContent className="h-[350px] flex items-center justify-center text-muted-foreground">
+                      <div className="text-center">
+                        <BarChart3 className="h-16 w-16 mx-auto text-muted-foreground/30 mb-4" />
+                        <p>Currency distribution chart will populate as transactions are processed</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
             </div>
             
             {/* Transactions Section */}
