@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { TransactionList } from "@/components/TransactionList";
@@ -12,12 +13,10 @@ import { initializeRippleWebsocket, formatAmount } from "@/lib/ripple-websocket"
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { TransactionDetailPanel } from "@/components/TransactionDetailPanel";
 import { TransactionStats } from "@/components/TransactionStats";
 import { NetworkStatusPanel } from "@/components/NetworkStatusPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
@@ -56,19 +55,6 @@ const Index = () => {
   // State for currency data
   const [currencies, setCurrencies] = useState<Map<string, number>>(new Map());
   
-  // State for detailed transaction view
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  
-  // Check if the device is mobile
-  const isMobile = useIsMobile();
-  
-  // Handle transaction selection
-  const handleTransactionSelect = (tx: Transaction) => {
-    setSelectedTransaction(tx);
-    setDetailDialogOpen(true);
-  };
-  
   // Calculate transactions per minute and other metrics
   useEffect(() => {
     const interval = setInterval(() => {
@@ -102,10 +88,16 @@ const Index = () => {
       });
       setUniqueAccounts(accounts);
       
+      // Set connection status to disconnected if no transactions in the last minute
+      if (connectionStatus === 'connected' && recentPayments === 0 && recentOffers === 0) {
+        setConnectionStatus('disconnected');
+        setStatusMessage('No recent transactions received');
+      }
+      
     }, 3000); // Update more frequently for a smoother experience
     
     return () => clearInterval(interval);
-  }, [paymentTxs, offerTxs, peakTPS]);
+  }, [paymentTxs, offerTxs, peakTPS, connectionStatus]);
   
   // Initialize WebSocket connection
   useEffect(() => {
@@ -169,6 +161,12 @@ const Index = () => {
         });
       }
       
+      // Set connection status to connected since we received a transaction
+      if (connectionStatus !== 'connected') {
+        setConnectionStatus('connected');
+        setStatusMessage(undefined);
+      }
+      
       // Show a toast notification for large payments (> 1000 XRP)
       try {
         if (tx.Amount) {
@@ -183,10 +181,6 @@ const Index = () => {
             toast.info(`Large Payment Detected: ${formatAmount(tx.Amount)}`, {
               description: `From: ${tx.Account?.slice(0, 8)}... To: ${tx.Destination?.slice(0, 8)}...`,
               duration: 4000,
-              action: {
-                label: "View",
-                onClick: () => handleTransactionSelect(tx),
-              },
             });
           }
         }
@@ -232,6 +226,12 @@ const Index = () => {
           return updated;
         });
       }
+      
+      // Set connection status to connected since we received a transaction
+      if (connectionStatus !== 'connected') {
+        setConnectionStatus('connected');
+        setStatusMessage(undefined);
+      }
     };
     
     // Connection status handler
@@ -266,7 +266,7 @@ const Index = () => {
     );
     
     return cleanup;
-  }, [largestTransaction]);
+  }, [largestTransaction, connectionStatus]);
   
   return (
     <SidebarProvider>
@@ -528,30 +528,6 @@ const Index = () => {
           </main>
         </div>
       </div>
-      
-      {/* Detail Dialog for Mobile */}
-      {isMobile && (
-        <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-          <DialogContent className="sm:max-w-[90vw] max-h-[90vh] overflow-auto p-0">
-            {selectedTransaction && (
-              <TransactionDetailPanel 
-                transaction={selectedTransaction} 
-                onClose={() => setDetailDialogOpen(false)} 
-              />
-            )}
-          </DialogContent>
-        </Dialog>
-      )}
-      
-      {/* Detail Panel for Desktop */}
-      {!isMobile && selectedTransaction && (
-        <div className="fixed right-0 top-0 w-[500px] h-full z-50 shadow-2xl">
-          <TransactionDetailPanel 
-            transaction={selectedTransaction} 
-            onClose={() => setSelectedTransaction(null)} 
-          />
-        </div>
-      )}
     </SidebarProvider>
   );
 };
