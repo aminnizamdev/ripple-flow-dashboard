@@ -58,22 +58,18 @@ export function formatDate(rippleTimestamp?: number): string {
 export function initializeRippleWebsocket(
   onPayment: TransactionCallback,
   onOfferCreate: TransactionCallback,
-  onOtherTransaction?: TransactionCallback,
-  onConnectionStatus?: (status: 'connecting' | 'connected' | 'disconnected' | 'error', message?: string) => void
+  onOtherTransaction?: TransactionCallback
 ): () => void {
   let ws: WebSocket | null = null;
   let isConnected = false;
   let reconnectTimeout: number | null = null;
   
   const connect = () => {
-    if (onConnectionStatus) onConnectionStatus('connecting');
-    
     try {
       ws = new WebSocket(WS_URL);
       
       ws.onopen = () => {
         isConnected = true;
-        if (onConnectionStatus) onConnectionStatus('connected');
         ws?.send(JSON.stringify(SUBSCRIBE_CMD));
       };
       
@@ -107,12 +103,10 @@ export function initializeRippleWebsocket(
       
       ws.onerror = (error) => {
         console.error("WebSocket error:", error);
-        if (onConnectionStatus) onConnectionStatus('error', "Connection error");
       };
       
       ws.onclose = () => {
         isConnected = false;
-        if (onConnectionStatus) onConnectionStatus('disconnected');
         // Reconnect after 5 seconds
         reconnectTimeout = window.setTimeout(() => {
           connect();
@@ -120,7 +114,6 @@ export function initializeRippleWebsocket(
       };
     } catch (error) {
       console.error("Error initializing WebSocket:", error);
-      if (onConnectionStatus) onConnectionStatus('error', "Failed to initialize connection");
       
       // Reconnect after 5 seconds
       reconnectTimeout = window.setTimeout(() => {

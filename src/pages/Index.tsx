@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { TransactionList } from "@/components/TransactionList";
@@ -12,12 +13,10 @@ import { initializeRippleWebsocket, formatAmount } from "@/lib/ripple-websocket"
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { TransactionDetailPanel } from "@/components/TransactionDetailPanel";
 import { TransactionStats } from "@/components/TransactionStats";
 import { NetworkStatusPanel } from "@/components/NetworkStatusPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
@@ -49,25 +48,11 @@ const Index = () => {
   const [uniqueAccounts, setUniqueAccounts] = useState<Set<string>>(new Set());
   const [peakTPS, setPeakTPS] = useState(0);
   
-  // State for connection status
-  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
-  const [statusMessage, setStatusMessage] = useState<string | undefined>();
-  
   // State for currency data
   const [currencies, setCurrencies] = useState<Map<string, number>>(new Map());
   
-  // State for detailed transaction view
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  
   // Check if the device is mobile
   const isMobile = useIsMobile();
-  
-  // Handle transaction selection
-  const handleTransactionSelect = (tx: Transaction) => {
-    setSelectedTransaction(tx);
-    setDetailDialogOpen(true);
-  };
   
   // Calculate transactions per minute and other metrics
   useEffect(() => {
@@ -168,31 +153,6 @@ const Index = () => {
           return updated;
         });
       }
-      
-      // Show a toast notification for large payments (> 1000 XRP)
-      try {
-        if (tx.Amount) {
-          let xrpAmount = 0;
-          if (typeof tx.Amount === 'string') {
-            xrpAmount = parseInt(tx.Amount) / 1000000.0;
-          } else if (tx.Amount.currency === 'XRP') {
-            xrpAmount = parseFloat(tx.Amount.value);
-          }
-          
-          if (xrpAmount > 1000) {
-            toast.info(`Large Payment Detected: ${formatAmount(tx.Amount)}`, {
-              description: `From: ${tx.Account?.slice(0, 8)}... To: ${tx.Destination?.slice(0, 8)}...`,
-              duration: 4000,
-              action: {
-                label: "View",
-                onClick: () => handleTransactionSelect(tx),
-              },
-            });
-          }
-        }
-      } catch (e) {
-        console.error("Error processing large payment notification:", e);
-      }
     };
     
     // Handler for offer transactions
@@ -234,35 +194,10 @@ const Index = () => {
       }
     };
     
-    // Connection status handler
-    const handleConnectionStatus = (
-      status: 'connecting' | 'connected' | 'disconnected' | 'error', 
-      message?: string
-    ) => {
-      setConnectionStatus(status);
-      setStatusMessage(message);
-      
-      if (status === 'connected') {
-        toast.success("Connected to Ripple Network", {
-          description: "Successfully subscribed to transaction streams",
-        });
-      } else if (status === 'disconnected') {
-        toast.warning("Disconnected from Ripple Network", {
-          description: "Attempting to reconnect...",
-        });
-      } else if (status === 'error') {
-        toast.error("Connection Error", {
-          description: message || "Failed to connect to Ripple Network",
-        });
-      }
-    };
-    
     // Initialize the WebSocket
     const cleanup = initializeRippleWebsocket(
       handlePayment,
-      handleOffer,
-      undefined,
-      handleConnectionStatus
+      handleOffer
     );
     
     return cleanup;
@@ -274,28 +209,16 @@ const Index = () => {
         <AppSidebar />
         
         <div className="flex-1 flex flex-col">
-          <DashboardHeader connectionStatus={connectionStatus} />
+          <DashboardHeader />
           
           <main className="flex-1 container px-4 py-6 md:px-6 md:py-8 overflow-auto">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6">
               <div>
                 <div className="inline-flex items-center gap-2">
                   <h1 className="text-3xl font-bold tracking-tight">Ripple Flow Dashboard</h1>
-                  <Badge variant="outline" className={cn(
-                    "px-2 py-0.5 text-xs font-medium rounded-md flex items-center gap-1",
-                    connectionStatus === 'connected' ? "bg-ripple-400/10 text-ripple-500" : 
-                    connectionStatus === 'connecting' ? "bg-amber-400/10 text-amber-500" : 
-                    "bg-red-400/10 text-red-500"
-                  )}>
-                    {connectionStatus === 'connected' && (
-                      <span className="h-1.5 w-1.5 rounded-full bg-ripple-500 animate-pulse"></span>
-                    )}
-                    {connectionStatus === 'connecting' && (
-                      <RefreshCw className="h-3 w-3 animate-spin" />
-                    )}
-                    {connectionStatus === 'connected' ? 'LIVE' : 
-                     connectionStatus === 'connecting' ? 'CONNECTING' : 
-                     'OFFLINE'}
+                  <Badge variant="outline" className="bg-ripple-400/10 text-ripple-500 px-2 py-0.5 text-xs font-medium rounded-md flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-ripple-500 animate-pulse"></span>
+                    LIVE
                   </Badge>
                 </div>
                 <p className="text-muted-foreground mt-1">
@@ -312,11 +235,7 @@ const Index = () => {
                 </p>
               </div>
               
-              <ConnectionStatus 
-                status={connectionStatus} 
-                message={statusMessage} 
-                className="mt-2 lg:mt-0"
-              />
+              <ConnectionStatus className="mt-2 lg:mt-0" />
             </div>
             
             {/* Stats Section */}
@@ -354,7 +273,7 @@ const Index = () => {
             {/* Network Status Panel */}
             <div className="mb-6">
               <NetworkStatusPanel 
-                connectionStatus={connectionStatus}
+                connectionStatus="connected"
                 transactionsPerMinute={transactionsPerMinute}
                 uniqueAccounts={uniqueAccounts.size}
                 currencies={currencies.size}
@@ -528,30 +447,6 @@ const Index = () => {
           </main>
         </div>
       </div>
-      
-      {/* Detail Dialog for Mobile */}
-      {isMobile && (
-        <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-          <DialogContent className="sm:max-w-[90vw] max-h-[90vh] overflow-auto p-0">
-            {selectedTransaction && (
-              <TransactionDetailPanel 
-                transaction={selectedTransaction} 
-                onClose={() => setDetailDialogOpen(false)} 
-              />
-            )}
-          </DialogContent>
-        </Dialog>
-      )}
-      
-      {/* Detail Panel for Desktop */}
-      {!isMobile && selectedTransaction && (
-        <div className="fixed right-0 top-0 w-[500px] h-full z-50 shadow-2xl">
-          <TransactionDetailPanel 
-            transaction={selectedTransaction} 
-            onClose={() => setSelectedTransaction(null)} 
-          />
-        </div>
-      )}
     </SidebarProvider>
   );
 };
